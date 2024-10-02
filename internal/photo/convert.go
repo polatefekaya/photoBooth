@@ -105,8 +105,8 @@ func (p *Photo) ReplaceBackground() {
 	fmt.Printf("Background Image Size x: %d y: %d\n", bgSize.X, bgSize.Y)
 
 	cOpts := CanvasOpts{
-		sizeX: 5120,
-		sizeY: 3840,
+		sizeX: bgSize.X,
+		sizeY: bgSize.Y,
 		bgColor: "no",
 	}
 

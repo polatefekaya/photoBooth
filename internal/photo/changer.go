@@ -26,21 +26,21 @@ func (c *Changer) placeBg() {
 	if canvas == nil {
 		log.Panicf("Canvas is nil, maybe calling createCanvas before this method works")
 	}
-	
-	draw.Draw(canvas, canvas.Bounds(), c.bg, image.Point{}, draw.Src)
+	bgSize := c.bg.Bounds()
+	draw.Draw(canvas, canvas.Bounds(), c.bg, image.Point{X: (bgSize.Dx()-canvas.Rect.Dx())/2, Y: 0}, draw.Src)
 
 	// m := image.NewRGBA(image.Rect(0, 0, 640, 480))
 	// blue := color.RGBA{0, 0, 255, 255}
 	// draw.Draw(m, m.Bounds(), &image.Uniform{blue}, image.ZP, draw.Src)
 }
 
-func calcX(bgX, imgX int) int {
-	mp := bgX / 2
+func calcX(imgX int) int {
+	mp := canvas.Rect.Dx() / 2
 	mp -= imgX / 2
 	return int(mp)
 }
-func calcY(bgY, imgY int) int {
-	bp := bgY
+func calcY(imgY int) int {
+	bp := canvas.Rect.Dy()
 	bp -= imgY 
 	return int(bp)
 }
@@ -49,10 +49,10 @@ func (c *Changer) placeImg() {
 	if canvas == nil {
 		log.Panicf("Canvas is nil, maybe calling createCanvas before this method works")
 	}
-	bgSize := c.bg.Bounds()
+	//bgSize := c.bg.Bounds()
 	imgSize := c.img.Bounds()
 
-	draw.Draw(canvas, c.img.Bounds().Add(image.Point{X:calcX(bgSize.Dx(), imgSize.Dx()), Y:calcY(bgSize.Dy(), imgSize.Dy())}), c.img, image.Point{}, draw.Over)
+	draw.Draw(canvas, c.img.Bounds().Add(image.Point{X:calcX(imgSize.Dx()), Y:calcY(imgSize.Dy())}), c.img, image.Point{}, draw.Over)
 
 }
 
