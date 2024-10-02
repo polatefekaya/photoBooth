@@ -2,7 +2,10 @@ package messaging
 
 import (
 	"log"
+
+	"github.com/google/uuid"
 	amqp "github.com/rabbitmq/amqp091-go"
+	"github.com/polatefekaya/photoBooth/internal/photo"
 )
 
 func failOnError(err error, msg string) {
@@ -44,7 +47,8 @@ func StartConnection(){
 
 	  go func() {
 		for d := range msgs {
-		  log.Printf("Received a message: %s", d.Body)
+		  log.Printf("Received a message, %s", d.Body[:50])
+			savePhoto(&d)
 		}
 	  }()
 	  
@@ -61,7 +65,20 @@ func StartConnection(){
 	)
 	failOnError(err, "Failed to declare a queue")
 	
-	body := "Hello World!"
+
+	id := uuid.New()
+
+
+	pht := photo.Photo{
+		Path: "./resources/image.jpg",
+	}
+
+	img, _, err := pht.DecodePhoto() 
+	failOnError(err, "Failed to decode the photo")
+
+	body, err := pht.EncodePhoto(&img)
+	failOnError(err, "Failed to encode the photo")
+
 	err = ch.Publish(
 		"",     // exchange
 		q.Name, // routing key
@@ -69,13 +86,14 @@ func StartConnection(){
 		false,  // immediate
 		amqp.Publishing {
 		  ContentType: "text/plain",
-		  Body:        []byte(body),
+		  Body:        body,
 		  ReplyTo: replyQueue.Name,
-		  CorrelationId: "1",
+		  CorrelationId: id.String(),
 	})
-
 	failOnError(err, "Failed to publish a message")
-	log.Printf(" [x] Sent %s\n", body)
+	
+	log.Printf(" [x] Sent %s\n", body[:20])
+
 	msgs2, err := ch.Consume(
 		replyQueue.Name, // queue
 		"",     // consumer
@@ -91,11 +109,19 @@ func StartConnection(){
 	  
 	  go func() {
 		for d := range msgs2 {
-		  log.Printf("Received a message: %s", d.Body)
-		  
+		  log.Printf("Received a message")
+		  savePhoto(&d)
 		}
 	  }()
 	  
 	  log.Printf(" [*] Waiting for messages. To exit press CTRL+C")
 	  <-forever
+}
+
+func savePhoto(d *amqp.Delivery){
+	pht := photo.Photo{
+		Path: "./resources/gen/image.jpeg",
+	}
+
+	pht.SavePhoto(&d.Body)
 }
