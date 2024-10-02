@@ -1,127 +1,146 @@
 package messaging
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/google/uuid"
-	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/polatefekaya/photoBooth/internal/photo"
+	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 func failOnError(err error, msg string) {
 	if err != nil {
-	  log.Panicf("%s: %s", msg, err)
+		log.Panicf("%s: %s", msg, err)
 	}
 }
+func warnOnError(err error, msg string) {
+	if err != nil {
+		log.Printf("%s: %s", msg, err)
+	}
+}
+
 //amqp://guest:guest@localhost:5672
-func StartConnection(){
-	conn, err := amqp.Dial("amqp://guest:guest@localhost:5672")
-	failOnError(err, "Failed to connect to RabbitMQ")
-	defer conn.Close()
 
+func openChannel(conn *amqp.Connection) (*amqp.Channel, error) {
 	ch, err := conn.Channel()
-	failOnError(err, "Failed to open a channel")
-	defer ch.Close()
+	warnOnError(err, "Issue while opening a channel")
+	return ch, err
+}
 
+func declareReplyQueue(ch *amqp.Channel) (*amqp.Queue, error) {
 	replyQueue, err := ch.QueueDeclare(
-		"", // name
-		false,   // durable
-		false,   // delete when unused
-		true,   // exclusive
-		false,   // no-wait
-		nil,     // arguments
+		"",    // name
+		false, // durable
+		false, // delete when unused
+		true,  // exclusive
+		false, // no-wait
+		nil,   // arguments
 	)
-	failOnError(err, "Failed to declare a queue")
-	
-	msgs, err := ch.Consume(
-		replyQueue.Name, // queue
-		"",     // consumer
-		true,   // auto-ack
-		false,  // exclusive
-		false,  // no-local
-		false,  // no-wait
-		nil,    // args
-	  )
-	  failOnError(err, "Failed to register a consumer")
-	  
+	warnOnError(err, "Issue while declaring a reply queue")
+	return &replyQueue, err
+}
 
-	  go func() {
+func consumeReplyQueue(ch *amqp.Channel, qname string) {
+	msgs, err := ch.Consume(
+		qname, // queue
+		"",    // consumer
+		true,  // auto-ack
+		false, // exclusive
+		false, // no-local
+		false, // no-wait
+		nil,   // args
+	)
+	failOnError(err, "Failed to register a consumer")
+
+	go func() {
 		for d := range msgs {
-		  log.Printf("Received a message, %s", d.Body[:50])
+			log.Printf("Received a message, %s", d.Body[:50])
 			savePhoto(&d)
 		}
-	  }()
-	  
-	  
+	}()
+}
 
-
+func declareRequestQueue(ch *amqp.Channel) (*amqp.Queue, error) {
 	q, err := ch.QueueDeclare(
 		"request-queue", // name
-		false,   // durable
-		false,   // delete when unused
-		false,   // exclusive
-		false,   // no-wait
-		nil,     // arguments
+		false,           // durable
+		false,           // delete when unused
+		false,           // exclusive
+		false,           // no-wait
+		nil,             // arguments
 	)
-	failOnError(err, "Failed to declare a queue")
-	
+	warnOnError(err, "Issue while declaring a request queue")
+	return &q, err
+}
 
-	id := uuid.New()
-
-
+func photoBytes() []byte {
 	pht := photo.Photo{
 		Path: "./resources/image.jpg",
 	}
 
-	img, _, err := pht.DecodePhoto() 
+	img, _, err := pht.DecodePhoto()
 	failOnError(err, "Failed to decode the photo")
 
 	body, err := pht.EncodePhoto(&img)
 	failOnError(err, "Failed to encode the photo")
 
-	err = ch.Publish(
-		"",     // exchange
-		q.Name, // routing key
-		false,  // mandatory
-		false,  // immediate
-		amqp.Publishing {
-		  ContentType: "text/plain",
-		  Body:        body,
-		  ReplyTo: replyQueue.Name,
-		  CorrelationId: id.String(),
-	})
-	failOnError(err, "Failed to publish a message")
-	
-	log.Printf(" [x] Sent %s\n", body[:20])
-
-	msgs2, err := ch.Consume(
-		replyQueue.Name, // queue
-		"",     // consumer
-		true,   // auto-ack
-		false,  // exclusive
-		false,  // no-local
-		false,  // no-wait
-		nil,    // args
-	  )
-	  failOnError(err, "Failed to register a consumer")
-	  
-	  var forever chan struct{}
-	  
-	  go func() {
-		for d := range msgs2 {
-		  log.Printf("Received a message")
-		  savePhoto(&d)
-		}
-	  }()
-	  
-	  log.Printf(" [*] Waiting for messages. To exit press CTRL+C")
-	  <-forever
+	return body
 }
 
-func savePhoto(d *amqp.Delivery){
+func publish(ch *amqp.Channel, reqQueueName string, replyQueueName string) error {
+	id := uuid.New()
+	fmt.Printf("new uuid is: %s\n", id.String())
+
+	body := photoBytes()
+
+	err := ch.Publish(
+		"",           // exchange
+		reqQueueName, // routing key
+		false,        // mandatory
+		false,        // immediate
+		amqp.Publishing{
+			ContentType:   "text/plain",
+			Body:          body,
+			ReplyTo:       replyQueueName,
+			CorrelationId: id.String(),
+		})
+	warnOnError(err, "Issue while publishing")
+	return err
+}
+
+func StartConnection() {
+	conn, err := amqp.Dial("amqp://guest:guest@localhost:5672")
+	failOnError(err, "Failed to connect to RabbitMQ")
+	defer conn.Close()
+
+	ch, err := openChannel(conn)
+	failOnError(err, "Failed to open a channel")
+	defer ch.Close()
+
+	replyQueue, err := declareReplyQueue(ch)
+	fmt.Printf("Declared Reply Queue Name: %s\n", replyQueue.Name)
+	failOnError(err, "Failed to declare a queue")
+
+	consumeReplyQueue(ch, replyQueue.Name)
+
+	reqQueue, err := declareRequestQueue(ch)
+	failOnError(err, "Failed to declare a queue")
+
+	err = publish(ch, reqQueue.Name, replyQueue.Name)
+	failOnError(err, "Failed to publish a message")
+
+	log.Printf(" [x] Sent an image\n")
+
+	var forever chan struct{}
+	log.Printf(" [*] Waiting for messages. To exit press CTRL+C")
+	<-forever
+}
+
+func savePhoto(d *amqp.Delivery) {
 	pht := photo.Photo{
-		Path: "./resources/gen/image.jpeg",
+		Path: "./resources/gen/image.png",
 	}
 
-	pht.SavePhoto(&d.Body)
+	pht.SavePng(&d.Body)
 }
