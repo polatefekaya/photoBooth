@@ -1,3 +1,4 @@
 bin
 .venv
 server/__pycache__
+resources/gen
