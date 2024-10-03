@@ -17,3 +17,8 @@ type CanvasOpts struct {
 	sizeY int
 	bgColor string 
 }
+
+type Nimage struct {
+	name string
+	img image.Image
+}

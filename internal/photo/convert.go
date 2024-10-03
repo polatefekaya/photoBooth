@@ -101,12 +101,11 @@ func (p *Photo) ReplaceBackground() {
 	bgSize := bg.Bounds().Size()
 	imgSize := img.Bounds().Size()
 	
-	fmt.Printf("Generated Image Size x: %d y: %d\n", imgSize.X, imgSize.Y)
-	fmt.Printf("Background Image Size x: %d y: %d\n", bgSize.X, bgSize.Y)
+	
 
 	cOpts := CanvasOpts{
-		sizeX: bgSize.X,
-		sizeY: bgSize.Y,
+		sizeX: 3000,
+		sizeY: 4000,
 		bgColor: "no",
 	}
 
@@ -116,4 +115,7 @@ func (p *Photo) ReplaceBackground() {
 		savePath: "./resources/gen/generated.png",
 	}
 	changer.BgChanger(&cOpts)
+
+	fmt.Printf("Foreground Image Size\n  before resize x: %d y: %d\n  after resize  x: %d y: %d\n", imgSize.X, imgSize.Y, changer.img.Bounds().Dx(), changer.img.Bounds().Dy())
+	fmt.Printf("Background Image Size\n  before resize x: %d y: %d\n  after resize  x: %d y: %d\n", bgSize.X, bgSize.Y, changer.bg.Bounds().Dx(), changer.bg.Bounds().Dy())
 }

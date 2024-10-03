@@ -6,13 +6,13 @@ import (
 	"image/png"
 	"log"
 	"os"
-	xdraw "golang.org/x/image/draw"
 )
 
 var canvas *image.RGBA = nil
 
 func (c *Changer) BgChanger(cOpts *CanvasOpts) {
 	c.createCanvas(cOpts)
+	c.Resize("height", true, 0.6, cOpts)
 	c.placeBg()
 	c.placeImg()
 	c.saveImg()
