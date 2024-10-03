@@ -10,6 +10,8 @@ targetCombined = $(targetPlatform)-$(targetArch)
 targetPath = ./bin/$(stage)/photoBooth
 mainFile = cmd/main/main.go
 
+serverFile = ./server/main.py
+
 .PHONY: compile
 compile:
 	echo "compiling for different platforms"
@@ -30,4 +32,15 @@ clean:
 .PHONY: cleanRun
 cleanRun: clean compile run
 
+.PHONY: serverDep
+serverDep:
+	cd ./server
+	pip install --upgrade onnxruntime
+	pip install --upgrade rembg
+	pip install --upgrade Pillow
+	pip install --upgrade pika
+	cd .
 
+.PHONY: server
+server:
+	py $(serverFile) 
